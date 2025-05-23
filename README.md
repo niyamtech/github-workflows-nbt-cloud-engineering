@@ -71,7 +71,7 @@ The followng two environments are requied to enable the approval step:
 - WorkflowApprovalNone
 - WorkflowApprovalRequired
 
-These can be deployed to your git repository via https://github.com/racwa/github-repo-management
+These can be deployed to your git repository via https://github.com/niyamtech/nbt-github-repo-management
 
 Example Code:
 
