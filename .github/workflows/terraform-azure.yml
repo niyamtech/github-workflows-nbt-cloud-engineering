@@ -1,0 +1,664 @@
+name: NBT Azure Terraform Plan & Apply Workflow
+
+on:
+  workflow_call:
+    inputs:
+      arm_subscription_id:
+        required: true
+        type: string
+      blast_radius_calculation:
+        default: false
+        required: false
+        type: boolean
+      i_like_fun:
+        default: false
+        required: false
+        type: boolean
+      run_tfsec_report:
+        default: true
+        required: false
+        type: boolean
+      tf_validation_check:
+        default: true
+        required: false
+        type: boolean
+      tf_apply_branch:
+        default: main
+        required: false
+        type: string
+      tf_backend_container:
+        required: false
+        type: string
+        default: "" # Set in code below
+      tf_backend_key:
+        required: false
+        type: string
+        default: "${{ github.repository }}.tfstate"
+      tf_backend_resource_group:
+        required: false
+        type: string
+        default: "platform-terraform-state"
+      tf_backend_storage_account:
+        required: false
+        type: string
+        default: "nbtplatformtfstate"
+      tf_backend_use_azuread_auth:
+        required: false
+        type: boolean
+        default: true
+      tf_backend_subscription_id:
+        required: false
+        type: string
+        default: "111111111-1111-1111-1111-91111111111a"
+      tf_options_apply:
+        default: -input=false -auto-approve
+        required: false
+        type: string
+      tf_options_plan:
+        default: -input=false
+        required: false
+        type: string
+      tf_dir:
+        default: ./
+        required: false
+        type: string
+      tf_plan_file:
+        default: tfplan.binary
+        required: false
+        type: string
+      tf_version:
+        default: latest
+        required: false
+        type: string
+      tfsec_args:
+        default: "--ignore-hcl-errors"
+        required: false
+        type: string
+      tf_plan_environment:
+        default: ""
+        required: false
+        type: string
+      tf_apply_environment:
+        default: ""
+        required: false
+        type: string        
+      test_dir:
+        default: ""
+        required: false
+        type: string
+      compare_plan_auth_mode:
+        description: The auth-mode to use for the az cli Storage Account intenbttions (key or login)
+        default: login
+        type: string
+      compare_plan:
+        description: >
+          When enabled the plan produced from the most recent commit in the PR is stored and later compared against the plan within the apply job.
+          When the plan differs then the apply job is run on the "WorkflowApprovalRequired" github environment allowing additional approval gates.
+        default: false
+        required: false
+        type: boolean
+      use_saved_plan:
+        description: >
+          When enabled the plan created during the plan stage is saved for later use in the apply stage.
+          This reduces work and time taken as the apply stage doesn't have to rerun the plan.
+        default: false
+        required: false
+        type: boolean
+      apply_empty_plan:
+        description: >
+          When enabled the apply stage won't be run if the Terraform plan shows now changes.
+          This reduces work and time taken as the apply stage doesn't have to run unnecessarily.
+        default: true
+        required: false
+        type: boolean
+      large_blast_radius_threshold:
+        description: >
+          Sets a custom large blast radius threshold for extra approval gating.
+          Defaults to 5000
+        default: 5000
+        required: false
+        type: number
+      runner:
+        description: set the runner type - ubuntu-latest for github hosted, or e.g. self-hosted-linux for private runner
+        default: ubuntu-latest
+        required: false
+        type: string
+      use_static_opa_binary:
+        description: use static OPA binary in blast radius calculation. required for self hosted RHEL 8
+        default: false
+        required: false
+        type: boolean
+      use_github_ro_app:
+        description: >
+          Set to true when using the GitHub App ID for the NBT Org read only app.
+          This allows authentication to private repos
+        default: false
+        required: false
+        type: boolean
+      override_upload:
+        default: false
+        required: false
+        type: boolean
+      pre_script:
+        description: PowerShell script to run before anything else.
+        default: ''
+        required: false
+        type: string
+      deployment_name:
+        description: >
+          The name of the deployment, only current used in the blast radius calculation when commenting on pull requests.
+          If you have multiple Terraform deployments in a single workflow you should define this for each deployment,
+          otherwise you will only get the blast radius calculation for the last deployment in your workflow.
+        default: ''
+        required: false
+        type: string
+      use_npe_tenant:
+        description: >
+          Set to true when using federated credentials and deploying to the NBTNPE tenant.
+        default: false
+        required: false
+        type: boolean
+      use_federated_credentials:
+        description: >
+          Set to true when using federated credentials.
+        default: false
+        required: false
+        type: boolean        
+      send_failure_email:
+        default: false
+        required: false
+        type: boolean
+      use_kubelogin:
+        default: false
+        required: false
+        type: boolean
+      kubelogin_version:
+        default: 'v0.0.24'
+        required: false
+        type: string
+      use_ssh_agent:
+        default: false
+        required: false
+        type: boolean
+    secrets:
+      AZURE_CLIENT_ID:
+        required: false
+      AZURE_CLIENT_SECRET:
+        required: false
+      AZURE_CREDENTIALS:
+        required: false
+      AZURE_TENANT_ID:
+        required: true
+      SVC_DOMAIN_JOIN_PASSWORD:
+        required: false
+      NPE_SVC_DOMAIN_JOIN_PASSWORD:
+        required: false
+      PERSONAL_ACCESS_TOKEN:
+        required: false
+      AZDO_PERSONAL_ACCESS_TOKEN: 
+        required: false
+      JIRA_API_KEY:
+          required: false
+      SSH_PRIVATE_KEY:
+        required: false
+      GH_REPO_READ_PRIVATE_KEY:
+        required: false
+
+jobs:
+  plan:
+    name: plan
+    environment: ${{inputs.tf_plan_environment}}
+    env:
+      ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+      ARM_SUBSCRIPTION_ID: ${{ inputs.arm_subscription_id }}
+      ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      SVC_DOMAIN_JOIN_PASSWORD: ${{ secrets.SVC_DOMAIN_JOIN_PASSWORD }}
+      NPE_SVC_DOMAIN_JOIN_PASSWORD: ${{ secrets.NPE_SVC_DOMAIN_JOIN_PASSWORD }}
+      PERSONAL_ACCESS_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+      GITHUB_WORKFLOW: ${{ github.workflow }}
+      AZDO_PERSONAL_ACCESS_TOKEN: ${{ secrets.AZDO_PERSONAL_ACCESS_TOKEN }}
+      
+  #   outputs:
+  #     workflow_environment: ${{ steps.compare_plan.outputs.workflow_environment }}
+  #     planned_changes: ${{ steps.compare_plan.outputs.planned_changes }}
+  #     plan_filename: ${{ steps.upload_plan.outputs.plan_filename }}
+  #     plan_show_filename: ${{ steps.compare_plan.outputs.plan_show_filename }}
+  #   runs-on: ${{ inputs.runner }}
+  #   steps:
+  #     - uses: terraform-compliance/github_action@0357bd3be2b0a5739f5c09c64366d50f64a9056f
+  #       if: inputs.test_dir != ''
+
+  #     - name: fix-terraform-container
+  #       run: |
+  #         if [ -z "${{ inputs.tf_backend_container }}" ]; then
+  #           container=${{github.repository}}
+  #           replacement=${container#nbt/}
+  #           echo ${replacement}
+  #           echo "tf_backend_container=${replacement}" >> $GITHUB_ENV
+  #         else
+  #           echo "tf_backend_container=${{ inputs.tf_backend_container}}" >> $GITHUB_ENV
+  #         fi
+  
+  #     - uses: actions/create-github-app-token@3ff1caaa28b64c9cc276ce0a02e2ff584f3900c5
+  #       if: ${{ env.PERSONAL_ACCESS_TOKEN == '' && inputs.use_github_ro_app }}
+  #       id: app-token
+  #       with:
+  #         app-id: ${{ vars.GH_REPO_READ_APP_ID }}
+  #         private-key: ${{ secrets.GH_REPO_READ_PRIVATE_KEY }}
+  #         owner: nbt
+
+  #     - name: Import SSH Key
+  #       if: ${{ inputs.use_ssh_agent }}
+  #       uses: webfactory/ssh-agent@a6f90b1f127823b31d4d4a8d96047790581349bd
+  #       with:
+  #           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+  #     - name: Checkout Code and Submodules - using PAT
+  #       if: ${{ env.PERSONAL_ACCESS_TOKEN }}
+  #       uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+  #       with:
+  #         submodules: true
+  #         token: "${{ secrets.PERSONAL_ACCESS_TOKEN }}"
+  #         persist-credentials: false
+      
+  #     - name: Checkout Code and Submodules - using app-token
+  #       if: ${{ env.PERSONAL_ACCESS_TOKEN == '' && inputs.use_github_ro_app }}
+  #       uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+  #       with:
+  #         submodules: true
+  #         token: ${{ steps.app-token.outputs.token }}
+  #         persist-credentials: false
+
+  #     - name: Checkout Code
+  #       if: ${{ env.PERSONAL_ACCESS_TOKEN == '' && !inputs.use_github_ro_app }}
+  #       uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+  #       with:
+  #         persist-credentials: false
+
+  #     - name: Setup credentials to access github using app-token
+  #       if: ${{ env.PERSONAL_ACCESS_TOKEN == '' && inputs.use_github_ro_app }}
+  #       run: |
+  #         git config --global url."https://x-access-token:${{ steps.app-token.outputs.token }}@github.com/".insteadOf https://github.com/
+
+  #     - name: Setup Terraform
+  #       uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd
+  #       with:
+  #         terraform_version: ${{ inputs.tf_version }}
+
+  #     - name: Azure Login Federated Creds
+  #       uses: Azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5
+  #       if : ${{ inputs.use_federated_credentials }}
+  #       with:
+  #         client-id: ${{ !inputs.use_npe_tenant && vars.AZURE_CLIENT_ID || vars.AZURE_CLIENT_ID_NPE }}
+  #         tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+  #         subscription-id: ${{ inputs.arm_subscription_id }}
+  #         allow-no-subscriptions: true
+
+  #     - name: Azure Login
+  #       uses: Azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5
+  #       if: ${{ ! inputs.use_federated_credentials }}
+  #       with:
+  #         allow-no-subscriptions: true
+  #         creds: ${{ secrets.AZURE_CREDENTIALS }}
+          
+  #     - name: Install Kubelogin
+  #       if: ${{ inputs.use_kubelogin }}
+  #       uses: azure/use-kubelogin@76597ae0fcbaace21b05e13a2cbf8daee2c6e820
+  #       with:
+  #         kubelogin-version: ${{ inputs.kubelogin_version }}
+
+  #     - name: Set Environment Variables for Federated Credentials
+  #       if: ${{ inputs.use_federated_credentials && !inputs.use_npe_tenant }}
+  #       run: |
+  #         echo "ARM_CLIENT_ID=${{ vars.AZURE_CLIENT_ID }}" >> $GITHUB_ENV
+        
+  #     - name: Set Environment Variables for Federated Credentials NPE Tenant
+  #       if: ${{ inputs.use_federated_credentials && inputs.use_npe_tenant }}
+  #       run: |
+  #         echo "ARM_CLIENT_ID=${{ vars.AZURE_CLIENT_ID_NPE }}" >> $GITHUB_ENV
+
+  #     - name: Pre-Script
+  #       if: ${{ inputs.pre_script != '' }}
+  #       shell: pwsh
+  #       run: ${{ inputs.pre_script }}
+  
+  #     - name: Terraform Syntax Check
+  #       continue-on-error: false
+  #       run: terraform -chdir='${{ inputs.tf_dir }}' fmt -check
+
+  #     - name: Terraform Init
+  #       run: terraform -chdir='${{ inputs.tf_dir }}' init -backend-config="subscription_id=${{ inputs.tf_backend_subscription_id }}" -backend-config="resource_group_name=${{ inputs.tf_backend_resource_group }}" -backend-config="storage_account_name=${{ inputs.tf_backend_storage_account }}" -backend-config="container_name=${{ env.tf_backend_container }}" -backend-config="key=${{ inputs.tf_backend_key }}" -backend-config="use_azuread_auth=${{ inputs.tf_backend_use_azuread_auth }}" -backend-config="use_oidc=${{ inputs.use_federated_credentials }}"
+
+  #     - name: Terraform Validation Check
+  #       if: ${{ inputs.tf_validation_check }}
+  #       continue-on-error: false
+  #       run: terraform -chdir='${{ inputs.tf_dir }}' validate
+
+  #     - name: Terraform Plan
+  #       run: terraform -chdir='${{ inputs.tf_dir }}' plan ${{ inputs.tf_options_plan }} -out=${{ inputs.tf_plan_file }}
+
+  #     - name: Compare Plans
+  #       if: ${{ github.event_name != 'pull_request' && inputs.compare_plan == true }}
+  #       id: compare_plan
+  #       run: |
+  #         # Get the PR number
+  #         pr_url=$(gh pr list --repo https://github.com/${{ github.repository }} --state merged --json url --jq .[].url --search ${{ github.sha }})
+  #         pr_number=$(echo "$pr_url" | sed -E 's|https://github\.com/[^/]*/[^/]*/pull/(\d*)|\1|g')
+  #         echo "======================================================="
+  #         echo "pr_number=$pr_number"
+
+  #         showpr="${{ inputs.tf_backend_key }}_show_${pr_number}.txt"
+  #         shownow="${{ inputs.tf_backend_key }}_show.txt"
+  #         echo "plan_show_filename=${showpr}" >> "$GITHUB_OUTPUT"
+
+  #         echo "Ensure local subfolders created(if required): $(dirname ""${showpr}"")"
+  #         mkdir -p "$(dirname ""${showpr}"")"
+
+  #         # Download the show plan file from the PR
+  #         echo "======================================================="
+  #         echo "Filename: $showpr"
+  #         echo "======================================================="
+  #         if ( ! az storage blob download --subscription ${{ inputs.tf_backend_subscription_id }} --account-name ${{ inputs.tf_backend_storage_account }} --auth-mode ${{ inputs.compare_plan_auth_mode }} -c ${{ env.tf_backend_container }} -n "$showpr" -f "${{ inputs.tf_dir }}${showpr}" --overwrite --no-progress ); then
+  #           echo "Unable to download PR show file" > "${{ inputs.tf_dir }}${showpr}"
+  #         fi
+
+  #         echo "======================================================="
+  #         echo "PR plan"
+  #         echo "======================================================="
+  #         cat "${{ inputs.tf_dir }}${showpr}"
+
+  #         # Create plan file from current plan
+  #         echo "======================================================="
+  #         echo "Current plan"
+  #         echo "======================================================="
+  #         terraform -chdir='${{ inputs.tf_dir }}' show ${{ inputs.tf_plan_file }} -no-color | tail -n +2 > "${{ inputs.tf_dir }}${shownow}"
+  #         cat "${{ inputs.tf_dir }}${shownow}"
+
+  #         # Compare PR plan with current plan
+  #         if cmp -s -- "${{ inputs.tf_dir }}${shownow}" "${{ inputs.tf_dir }}${showpr}"; then
+  #           echo "======================================================="
+  #           echo "The plan has not changed since the PR was approved."
+  #           echo "======================================================="
+  #           echo "workflow_environment=WorkflowApprovalNone" >> "$GITHUB_OUTPUT"
+  #         else
+  #           echo "======================================================="
+  #           echo "The plan has changed since the PR was approved."
+  #           echo "======================================================="
+  #           echo "workflow_environment=WorkflowApprovalRequired" >> "$GITHUB_OUTPUT"
+  #         fi
+
+  #         # Check to see if plan contains changes
+  #         if [ $(grep -c "No changes." "${{ inputs.tf_dir }}${shownow}") -ne 0 ]
+  #         then
+  #           echo "planned_changes=false" >> "$GITHUB_OUTPUT"
+  #         else
+  #           echo "planned_changes=true" >> "$GITHUB_OUTPUT"
+  #         fi
+  #       env:
+  #         GH_TOKEN: ${{ github.token }}
+
+  #     - name: Upload Plan Show
+  #       if: ${{ (github.event_name == 'pull_request' && inputs.compare_plan == true) }}
+  #       id: save_show_plan
+  #       run: |
+  #         showpr="${{ inputs.tf_backend_key }}_show_${{ github.event.pull_request.number }}.txt"
+  #         echo "======================================================="
+  #         echo "Filename: ${showpr}"
+  #         echo "======================================================="
+
+  #         echo "Ensure local subfolders created(if required): $(dirname ""${showpr}"")"
+  #         mkdir -p "$(dirname ""${showpr}"")"
+
+  #         terraform -chdir='${{ inputs.tf_dir }}' show ${{ inputs.tf_plan_file }} -no-color | tail -n +2 > "${{ inputs.tf_dir }}${showpr}"
+  #         cat "${{ inputs.tf_dir }}${showpr}"
+  #         echo "======================================================="
+
+  #         az storage blob upload --subscription ${{ inputs.tf_backend_subscription_id }} --account-name ${{ inputs.tf_backend_storage_account }} --auth-mode ${{ inputs.compare_plan_auth_mode }} -c ${{ env.tf_backend_container }} -n "${showpr}" -f "${{ inputs.tf_dir }}${showpr}" --tags storage_management_policy=tf_save_plan_file --overwrite
+
+  #     - name: Upload Plan
+  #       if: ${{ (github.event_name != 'pull_request' && inputs.use_saved_plan == true && ( steps.compare_plan.outputs.planned_changes == 'true' || inputs.apply_empty_plan == true)) || inputs.override_upload == true }}
+  #       id: upload_plan
+  #       run: |
+  #         echo "======================================================="
+  #         echo "Upload Current Plan to Storage Account"
+  #         echo "======================================================="
+  #         plan_filename="plan_$(uuidgen)"
+  #         echo "plan_filename=${plan_filename}" >> "$GITHUB_OUTPUT"
+  #         az storage blob upload --subscription ${{ inputs.tf_backend_subscription_id }} --account-name ${{ inputs.tf_backend_storage_account  }} --auth-mode ${{ inputs.compare_plan_auth_mode }} -c ${{ env.tf_backend_container }} -n $plan_filename -f ${{ inputs.tf_dir }}/${{ inputs.tf_plan_file }} --tags storage_management_policy=tf_save_plan_file --overwrite
+  #       env:
+  #         GH_TOKEN: ${{ github.token }}
+
+  #     - name: Run Tests
+  #       if: inputs.test_dir != ''
+  #       continue-on-error: true
+  #       id: terraform-compliance
+  #       run: |
+  #         terraform-compliance -p "${{ inputs.tf_dir }}/${{ inputs.tf_plan_file }}" -f "${{ inputs.test_dir }}" --junit-xml=test-report.xml
+
+  #     - name: Publish Test Report
+  #       if: inputs.test_dir != ''
+  #       uses: mikepenz/action-junit-report@cf701569b05ccdd861a76b8607a66d76f6fd4857
+  #       with:
+  #         report_paths: "test-report.xml"
+  #         fail_on_failure: true
+  #         check_name: CHECK - TC - ${{ env.GITHUB_WORKFLOW }}
+
+  #     - name: Run TFSec
+  #       if: ${{ inputs.run_tfsec_report }}
+  #       uses: aquasecurity/tfsec-pr-commenter-action@7a44c5dcde5dfab737363e391800629e27b6376b
+  #       with:
+  #         working_directory: ${{ inputs.tf_dir }}
+  #         tfsec_args: ${{ inputs.tfsec_args }}
+  #         github_token: ${{ secrets.GITHUB_TOKEN }}
+  #         soft_fail_commenter: true
+  #         tfsec_version: v1.28.1
+
+  #     - name: Blast Radius Calculation
+  #       if: ${{ inputs.blast_radius_calculation }}
+  #       id: blast_radius_calculation_step
+  #       uses: nbt/blast-radius-calculation-action@1.8.2
+  #       with:
+  #         rego-file-location: ".github/workflows/terraform.rego"
+  #         terraform-plan-location: ${{ inputs.tf_plan_file }}
+  #         gh-token: "${{ secrets.GITHUB_TOKEN }}"
+  #         terraform-dir: ${{ inputs.tf_dir }}
+  #         show-images: ${{ inputs.i_like_fun }}
+  #         use-static-opa-binary: ${{ inputs.use_static_opa_binary }}
+  #         deployment-name: ${{ inputs.deployment_name }}
+
+  #     - name: Large Blast Radius Approvals
+  #       if: ${{ inputs.blast_radius_calculation }}
+  #       id: large_blast_radius_gateway
+  #       run: |
+  #         # Check calculated blast radius
+  #         blast_radius=$(echo '${{ steps.blast_radius_calculation_step.outputs.blastRadiusScore }}' | jq '.blastRadius')
+  #         echo $blast_radius
+  #         echo ${{inputs.large_blast_radius_threshold }}
+  #         if [ $blast_radius -ge ${{ inputs.large_blast_radius_threshold }} ]; then
+  #           echo "======================================================="
+  #           echo "The blast radius is higher than the configured threshold."
+  #           echo "======================================================="
+  #           echo "workflow_environment=WorkflowApprovalRequired" >> "$GITHUB_OUTPUT"
+  #         fi
+  #     - name: JIRA Failure Ticket
+  #       if: ${{ inputs.send_failure_email && failure() && format('refs/heads/{0}', inputs.tf_apply_branch) == github.ref}}
+  #       uses: fjogeleit/http-request-action@23ad54bcd1178fcff6a0d17538fa09de3a7f0a4d
+  #       with:
+  #         url: https://nbt-wa.atlassian.net/rest/api/latest/issue/
+  #         method: POST
+  #         username: servicedesk.automation@nbt.com.au
+  #         password: ${{ secrets.JIRA_API_KEY }}
+  #         customHeaders: '{"Content-Type": "application/json"}'
+  #         data: '{"fields":{"project":{"id":"13836"},"summary":"GitHub Workflow Plan Failure ${{ github.repository }}","reporter":{"id": "5d81a98630926d0c33b257e7"},"description":"GitHub Workflow ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }} has failed a run. Please remediate.","customfield_15162": [{"workspaceId": "cf975247-89cd-4840-bd2b-e4d6f7882bee","id": "cf975247-89cd-4840-bd2b-e4d6f7882bee:106732","objectId": "106732"}],"issuetype":{"id":"11237"},"customfield_13658":{"value":"ETS","child":{"value":"Cloud Operations"}}}}'
+
+  # apply:
+  #   name: apply
+  #   # Run if main branch and (there are changes or it is configured to run even with no changes)
+  #   if: ${{ format('refs/heads/{0}', inputs.tf_apply_branch) == github.ref && ( needs.Plan.outputs.planned_changes == 'true' || inputs.apply_empty_plan == true)}}
+  #   needs: Plan
+  #   environment: ${{needs.Plan.outputs.workflow_environment || inputs.tf_apply_environment }}
+  #   env:
+  #     ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+  #     ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+  #     ARM_SUBSCRIPTION_ID: ${{ inputs.arm_subscription_id }}
+  #     ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+  #     SVC_DOMAIN_JOIN_PASSWORD: ${{ secrets.SVC_DOMAIN_JOIN_PASSWORD }}
+  #     NPE_SVC_DOMAIN_JOIN_PASSWORD: ${{ secrets.NPE_SVC_DOMAIN_JOIN_PASSWORD }}
+  #     PERSONAL_ACCESS_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+  #     PLAN_FILENAME: ${{needs.Plan.outputs.plan_filename}}
+  #     PLAN_SHOW_FILENAME: ${{needs.Plan.outputs.plan_show_filename}}
+  #     AZDO_PERSONAL_ACCESS_TOKEN: ${{ secrets.AZDO_PERSONAL_ACCESS_TOKEN }}
+  #   runs-on: ${{ inputs.runner }}
+  #   steps:
+  #     - name: fix-terraform-container
+  #       run: |
+  #         if [ -z "${{ inputs.tf_backend_container }}" ]; then
+  #           container=${{github.repository}}
+  #           replacement=${container#nbt/}
+  #           echo ${replacement}
+  #           echo "tf_backend_container=${replacement}" >> $GITHUB_ENV
+  #         else
+  #           echo "tf_backend_container=${{ inputs.tf_backend_container}}" >> $GITHUB_ENV
+  #         fi
+  
+  #     - uses: actions/create-github-app-token@3ff1caaa28b64c9cc276ce0a02e2ff584f3900c5
+  #       if: ${{ env.PERSONAL_ACCESS_TOKEN == '' && inputs.use_github_ro_app }}
+  #       id: app-token
+  #       with:
+  #         app-id: ${{ vars.GH_REPO_READ_APP_ID }}
+  #         private-key: ${{ secrets.GH_REPO_READ_PRIVATE_KEY }}
+  #         owner: nbt
+          
+  #     - name: Import SSH Key
+  #       if: ${{ inputs.use_ssh_agent }}
+  #       uses: webfactory/ssh-agent@a6f90b1f127823b31d4d4a8d96047790581349bd
+  #       with:
+  #           ssh-private-key:  ${{ secrets.SSH_PRIVATE_KEY }}
+
+  #     - name: Checkout Code and Submodules - using PAT
+  #       if: ${{ env.PERSONAL_ACCESS_TOKEN }}
+  #       uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+  #       with:
+  #         submodules: true
+  #         token: "${{ secrets.PERSONAL_ACCESS_TOKEN }}"
+  #         persist-credentials: false
+
+  #     - name: Checkout Code and Submodules - using app-token
+  #       if: ${{ env.PERSONAL_ACCESS_TOKEN == '' && inputs.use_github_ro_app }}
+  #       uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+  #       with:
+  #         submodules: true
+  #         token: ${{ steps.app-token.outputs.token }}
+  #         persist-credentials: false
+
+  #     - name: Checkout Code
+  #       if: ${{ env.PERSONAL_ACCESS_TOKEN == '' && !inputs.use_github_ro_app }}
+  #       uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+  #       with:
+  #         persist-credentials: false
+
+  #     - name: Setup credentials to access github using app-token
+  #       if: ${{ env.PERSONAL_ACCESS_TOKEN == '' && inputs.use_github_ro_app }}
+  #       run: |
+  #         git config --global url."https://x-access-token:${{ steps.app-token.outputs.token }}@github.com/".insteadOf https://github.com/
+     
+  #     - name: Setup Terraform
+  #       uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd
+  #       with:
+  #         terraform_version: ${{ inputs.tf_version }}
+
+  #     - name: Azure Login Federated Creds
+  #       uses: Azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5
+  #       if : ${{ inputs.use_federated_credentials }}
+  #       with:
+  #         client-id: ${{ !inputs.use_npe_tenant && vars.AZURE_CLIENT_ID || vars.AZURE_CLIENT_ID_NPE }}
+  #         tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+  #         subscription-id: ${{ inputs.arm_subscription_id }}
+  #         allow-no-subscriptions: true
+
+  #     - name: Azure Login
+  #       uses: Azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5
+  #       if: ${{ ! inputs.use_federated_credentials }}
+  #       with:
+  #         allow-no-subscriptions: true
+  #         creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+  #     - name: Install Kubelogin
+  #       if: ${{ inputs.use_kubelogin }}
+  #       uses: azure/use-kubelogin@76597ae0fcbaace21b05e13a2cbf8daee2c6e820
+  #       with:
+  #         kubelogin-version: ${{ inputs.kubelogin_version }}
+        
+  #     - name: Set Environment Variables for Federated Credentials
+  #       if: ${{ inputs.use_federated_credentials && !inputs.use_npe_tenant }}
+  #       run: |
+  #         echo "ARM_CLIENT_ID=${{ vars.AZURE_CLIENT_ID }}" >> $GITHUB_ENV
+        
+  #     - name: Set Environment Variables for Federated Credentials NPE Tenant
+  #       if: ${{ inputs.use_federated_credentials && inputs.use_npe_tenant }}
+  #       run: |
+  #         echo "ARM_CLIENT_ID=${{ vars.AZURE_CLIENT_ID_NPE }}" >> $GITHUB_ENV
+
+  #     - name: Pre-Script
+  #       if: ${{ inputs.pre_script != '' }}
+  #       shell: pwsh
+  #       run: ${{ inputs.pre_script }}
+
+  #     - name: Terraform Syntax Check
+  #       continue-on-error: false
+  #       run: terraform -chdir='${{ inputs.tf_dir }}' fmt -check          
+
+  #     - name: Terraform Init
+  #       run: terraform -chdir='${{ inputs.tf_dir }}' init -backend-config="subscription_id=${{ inputs.tf_backend_subscription_id }}" -backend-config="resource_group_name=${{ inputs.tf_backend_resource_group }}" -backend-config="storage_account_name=${{ inputs.tf_backend_storage_account }}" -backend-config="container_name=${{ env.tf_backend_container }}" -backend-config="key=${{ inputs.tf_backend_key }}" -backend-config="use_azuread_auth=${{ inputs.tf_backend_use_azuread_auth }}" -backend-config="use_oidc=${{ inputs.use_federated_credentials }}"
+          
+  #     - name: Terraform Apply
+  #       if: ${{ ! inputs.use_saved_plan }}
+  #       run: terraform -chdir='${{ inputs.tf_dir }}' apply ${{ inputs.tf_options_apply }}
+
+  #     - name: Terraform Apply (from saved plan)
+  #       if: ${{ inputs.use_saved_plan }}
+  #       run: |
+  #         # Download the plan file created in the plan stage
+  #         plan_filename="${{ env.PLAN_FILENAME }}"
+  #         echo "======================================================="
+  #         echo "Filename: ${plan_filename}"
+  #         echo "======================================================="
+  #         # make sure the plan filename is not using blank guid
+  #         if [ ${#plan_filename} -lt 36 ]; then
+  #           echo "Invalid plan_filename"
+  #           exit 1
+  #         fi
+
+  #         az storage blob download --subscription ${{ inputs.tf_backend_subscription_id }} --account-name ${{ inputs.tf_backend_storage_account }} --auth-mode ${{ inputs.compare_plan_auth_mode }} -c ${{ env.tf_backend_container }} -n  ${{ env.PLAN_FILENAME }} -f "${{ inputs.tf_dir }}/${{ env.PLAN_FILENAME }}" --overwrite --no-progress
+
+  #         terraform -chdir='${{ inputs.tf_dir }}' show "${{ env.PLAN_FILENAME }}"
+
+  #         terraform -chdir='${{ inputs.tf_dir }}' apply ${{ inputs.tf_options_apply }} "${{ env.PLAN_FILENAME }}"
+
+  #     - name: Clean Up Plan File
+  #       if: ${{ inputs.use_saved_plan }}
+  #       continue-on-error: true
+  #       run: |
+  #         # Delete plan
+  #         echo "Delete plan file: ${{ env.PLAN_FILENAME }}"
+  #         az storage blob delete --subscription ${{ inputs.tf_backend_subscription_id }} --account-name ${{ inputs.tf_backend_storage_account }} --auth-mode ${{ inputs.compare_plan_auth_mode }} -c ${{ env.tf_backend_container }} -n  ${{ env.PLAN_FILENAME }}
+
+  #     - name: Clean Up Plan Show File
+  #       if: ${{ inputs.compare_plan }}
+  #       continue-on-error: true
+  #       run: |
+  #         # Delete plan
+  #         echo "Delete plan show file: ${{ env.PLAN_SHOW_FILENAME }}"
+  #         az storage blob delete --subscription ${{ inputs.tf_backend_subscription_id }} --account-name ${{ inputs.tf_backend_storage_account }} --auth-mode ${{ inputs.compare_plan_auth_mode }} -c ${{ env.tf_backend_container }} -n  ${{ env.PLAN_SHOW_FILENAME }}
+      
+  #     - name: JIRA Failure Ticket
+  #       if: ${{ inputs.send_failure_email && failure() && format('refs/heads/{0}', inputs.tf_apply_branch) == github.ref }}
+  #       uses: fjogeleit/http-request-action@23ad54bcd1178fcff6a0d17538fa09de3a7f0a4d
+  #       with:
+  #         url: https://nbt-wa.atlassian.net/rest/api/latest/issue/
+  #         method: POST
+  #         username: servicedesk.automation@nbt.com.au
+  #         password: ${{ secrets.JIRA_API_KEY }}
+  #         customHeaders: '{"Content-Type": "application/json"}'
+  #         data: '{"fields":{"project":{"id":"13836"},"summary":"GitHub Workflow Apply Failure ${{ github.repository }}","reporter":{"id": "5d81a98630926d0c33b257e7"},"description":"[GitHub Workflow](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) has failed a run. Please remediate.","customfield_15162": [{"workspaceId": "cf975247-89cd-4840-bd2b-e4d6f7882bee","id": "cf975247-89cd-4840-bd2b-e4d6f7882bee:106732","objectId": "106732"}],"issuetype":{"id":"11237"},"customfield_13658":{"value":"ETS","child":{"value":"Cloud Operations"}}}}'
