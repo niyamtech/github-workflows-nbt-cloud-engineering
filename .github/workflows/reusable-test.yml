@@ -1,0 +1,11 @@
+name: NBT Reusable YAML
+
+on:
+  workflow_call:
+
+jobs:
+  say-hello:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Echo from reusable workflow
+        run: echo "👋 I live in another repo"
