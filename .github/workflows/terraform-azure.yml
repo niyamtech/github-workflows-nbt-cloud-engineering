@@ -6,203 +6,203 @@ on:
       arm_subscription_id:
         required: true
         type: string
-      blast_radius_calculation:
-        default: false
-        required: false
-        type: boolean
-      i_like_fun:
-        default: false
-        required: false
-        type: boolean
-      run_tfsec_report:
-        default: true
-        required: false
-        type: boolean
-      tf_validation_check:
-        default: true
-        required: false
-        type: boolean
-      tf_apply_branch:
-        default: main
-        required: false
-        type: string
-      tf_backend_container:
-        required: false
-        type: string
-        default: "" # Set in code below
-      tf_backend_key:
-        required: false
-        type: string
-        default: "${{ github.repository }}.tfstate"
-      tf_backend_resource_group:
-        required: false
-        type: string
-        default: "platform-terraform-state"
-      tf_backend_storage_account:
-        required: false
-        type: string
-        default: "nbtplatformtfstate"
-      tf_backend_use_azuread_auth:
-        required: false
-        type: boolean
-        default: true
-      tf_backend_subscription_id:
-        required: false
-        type: string
-        default: "111111111-1111-1111-1111-91111111111a"
-      tf_options_apply:
-        default: -input=false -auto-approve
-        required: false
-        type: string
-      tf_options_plan:
-        default: -input=false
-        required: false
-        type: string
-      tf_dir:
-        default: ./
-        required: false
-        type: string
-      tf_plan_file:
-        default: tfplan.binary
-        required: false
-        type: string
-      tf_version:
-        default: latest
-        required: false
-        type: string
-      tfsec_args:
-        default: "--ignore-hcl-errors"
-        required: false
-        type: string
-      tf_plan_environment:
-        default: ""
-        required: false
-        type: string
-      tf_apply_environment:
-        default: ""
-        required: false
-        type: string        
-      test_dir:
-        default: ""
-        required: false
-        type: string
-      compare_plan_auth_mode:
-        description: The auth-mode to use for the az cli Storage Account intenbttions (key or login)
-        default: login
-        type: string
-      compare_plan:
-        description: >
-          When enabled the plan produced from the most recent commit in the PR is stored and later compared against the plan within the apply job.
-          When the plan differs then the apply job is run on the "WorkflowApprovalRequired" github environment allowing additional approval gates.
-        default: false
-        required: false
-        type: boolean
-      use_saved_plan:
-        description: >
-          When enabled the plan created during the plan stage is saved for later use in the apply stage.
-          This reduces work and time taken as the apply stage doesn't have to rerun the plan.
-        default: false
-        required: false
-        type: boolean
-      apply_empty_plan:
-        description: >
-          When enabled the apply stage won't be run if the Terraform plan shows now changes.
-          This reduces work and time taken as the apply stage doesn't have to run unnecessarily.
-        default: true
-        required: false
-        type: boolean
-      large_blast_radius_threshold:
-        description: >
-          Sets a custom large blast radius threshold for extra approval gating.
-          Defaults to 5000
-        default: 5000
-        required: false
-        type: number
-      runner:
-        description: set the runner type - ubuntu-latest for github hosted, or e.g. self-hosted-linux for private runner
-        default: ubuntu-latest
-        required: false
-        type: string
-      use_static_opa_binary:
-        description: use static OPA binary in blast radius calculation. required for self hosted RHEL 8
-        default: false
-        required: false
-        type: boolean
-      use_github_ro_app:
-        description: >
-          Set to true when using the GitHub App ID for the NBT Org read only app.
-          This allows authentication to private repos
-        default: false
-        required: false
-        type: boolean
-      override_upload:
-        default: false
-        required: false
-        type: boolean
-      pre_script:
-        description: PowerShell script to run before anything else.
-        default: ''
-        required: false
-        type: string
-      deployment_name:
-        description: >
-          The name of the deployment, only current used in the blast radius calculation when commenting on pull requests.
-          If you have multiple Terraform deployments in a single workflow you should define this for each deployment,
-          otherwise you will only get the blast radius calculation for the last deployment in your workflow.
-        default: ''
-        required: false
-        type: string
-      use_npe_tenant:
-        description: >
-          Set to true when using federated credentials and deploying to the NBTNPE tenant.
-        default: false
-        required: false
-        type: boolean
-      use_federated_credentials:
-        description: >
-          Set to true when using federated credentials.
-        default: false
-        required: false
-        type: boolean        
-      send_failure_email:
-        default: false
-        required: false
-        type: boolean
-      use_kubelogin:
-        default: false
-        required: false
-        type: boolean
-      kubelogin_version:
-        default: 'v0.0.24'
-        required: false
-        type: string
-      use_ssh_agent:
-        default: false
-        required: false
-        type: boolean
-    secrets:
-      AZURE_CLIENT_ID:
-        required: false
-      AZURE_CLIENT_SECRET:
-        required: false
-      AZURE_CREDENTIALS:
-        required: false
-      AZURE_TENANT_ID:
-        required: true
-      SVC_DOMAIN_JOIN_PASSWORD:
-        required: false
-      NPE_SVC_DOMAIN_JOIN_PASSWORD:
-        required: false
-      PERSONAL_ACCESS_TOKEN:
-        required: false
-      AZDO_PERSONAL_ACCESS_TOKEN: 
-        required: false
-      JIRA_API_KEY:
-          required: false
-      SSH_PRIVATE_KEY:
-        required: false
-      GH_REPO_READ_PRIVATE_KEY:
-        required: false
+    #   blast_radius_calculation:
+    #     default: false
+    #     required: false
+    #     type: boolean
+    #   i_like_fun:
+    #     default: false
+    #     required: false
+    #     type: boolean
+    #   run_tfsec_report:
+    #     default: true
+    #     required: false
+    #     type: boolean
+    #   tf_validation_check:
+    #     default: true
+    #     required: false
+    #     type: boolean
+    #   tf_apply_branch:
+    #     default: main
+    #     required: false
+    #     type: string
+    #   tf_backend_container:
+    #     required: false
+    #     type: string
+    #     default: "" # Set in code below
+    #   tf_backend_key:
+    #     required: false
+    #     type: string
+    #     default: "${{ github.repository }}.tfstate"
+    #   tf_backend_resource_group:
+    #     required: false
+    #     type: string
+    #     default: "platform-terraform-state"
+    #   tf_backend_storage_account:
+    #     required: false
+    #     type: string
+    #     default: "nbtplatformtfstate"
+    #   tf_backend_use_azuread_auth:
+    #     required: false
+    #     type: boolean
+    #     default: true
+    #   tf_backend_subscription_id:
+    #     required: false
+    #     type: string
+    #     default: "111111111-1111-1111-1111-91111111111a"
+    #   tf_options_apply:
+    #     default: -input=false -auto-approve
+    #     required: false
+    #     type: string
+    #   tf_options_plan:
+    #     default: -input=false
+    #     required: false
+    #     type: string
+    #   tf_dir:
+    #     default: ./
+    #     required: false
+    #     type: string
+    #   tf_plan_file:
+    #     default: tfplan.binary
+    #     required: false
+    #     type: string
+    #   tf_version:
+    #     default: latest
+    #     required: false
+    #     type: string
+    #   tfsec_args:
+    #     default: "--ignore-hcl-errors"
+    #     required: false
+    #     type: string
+    #   tf_plan_environment:
+    #     default: ""
+    #     required: false
+    #     type: string
+    #   tf_apply_environment:
+    #     default: ""
+    #     required: false
+    #     type: string        
+    #   test_dir:
+    #     default: ""
+    #     required: false
+    #     type: string
+    #   compare_plan_auth_mode:
+    #     description: The auth-mode to use for the az cli Storage Account intenbttions (key or login)
+    #     default: login
+    #     type: string
+    #   compare_plan:
+    #     description: >
+    #       When enabled the plan produced from the most recent commit in the PR is stored and later compared against the plan within the apply job.
+    #       When the plan differs then the apply job is run on the "WorkflowApprovalRequired" github environment allowing additional approval gates.
+    #     default: false
+    #     required: false
+    #     type: boolean
+    #   use_saved_plan:
+    #     description: >
+    #       When enabled the plan created during the plan stage is saved for later use in the apply stage.
+    #       This reduces work and time taken as the apply stage doesn't have to rerun the plan.
+    #     default: false
+    #     required: false
+    #     type: boolean
+    #   apply_empty_plan:
+    #     description: >
+    #       When enabled the apply stage won't be run if the Terraform plan shows now changes.
+    #       This reduces work and time taken as the apply stage doesn't have to run unnecessarily.
+    #     default: true
+    #     required: false
+    #     type: boolean
+    #   large_blast_radius_threshold:
+    #     description: >
+    #       Sets a custom large blast radius threshold for extra approval gating.
+    #       Defaults to 5000
+    #     default: 5000
+    #     required: false
+    #     type: number
+    #   runner:
+    #     description: set the runner type - ubuntu-latest for github hosted, or e.g. self-hosted-linux for private runner
+    #     default: ubuntu-latest
+    #     required: false
+    #     type: string
+    #   use_static_opa_binary:
+    #     description: use static OPA binary in blast radius calculation. required for self hosted RHEL 8
+    #     default: false
+    #     required: false
+    #     type: boolean
+    #   use_github_ro_app:
+    #     description: >
+    #       Set to true when using the GitHub App ID for the NBT Org read only app.
+    #       This allows authentication to private repos
+    #     default: false
+    #     required: false
+    #     type: boolean
+    #   override_upload:
+    #     default: false
+    #     required: false
+    #     type: boolean
+    #   pre_script:
+    #     description: PowerShell script to run before anything else.
+    #     default: ''
+    #     required: false
+    #     type: string
+    #   deployment_name:
+    #     description: >
+    #       The name of the deployment, only current used in the blast radius calculation when commenting on pull requests.
+    #       If you have multiple Terraform deployments in a single workflow you should define this for each deployment,
+    #       otherwise you will only get the blast radius calculation for the last deployment in your workflow.
+    #     default: ''
+    #     required: false
+    #     type: string
+    #   use_npe_tenant:
+    #     description: >
+    #       Set to true when using federated credentials and deploying to the NBTNPE tenant.
+    #     default: false
+    #     required: false
+    #     type: boolean
+    #   use_federated_credentials:
+    #     description: >
+    #       Set to true when using federated credentials.
+    #     default: false
+    #     required: false
+    #     type: boolean        
+    #   send_failure_email:
+    #     default: false
+    #     required: false
+    #     type: boolean
+    #   use_kubelogin:
+    #     default: false
+    #     required: false
+    #     type: boolean
+    #   kubelogin_version:
+    #     default: 'v0.0.24'
+    #     required: false
+    #     type: string
+    #   use_ssh_agent:
+    #     default: false
+    #     required: false
+    #     type: boolean
+    # secrets:
+    #   AZURE_CLIENT_ID:
+    #     required: false
+    #   AZURE_CLIENT_SECRET:
+    #     required: false
+    #   AZURE_CREDENTIALS:
+    #     required: false
+    #   AZURE_TENANT_ID:
+    #     required: true
+    #   SVC_DOMAIN_JOIN_PASSWORD:
+    #     required: false
+    #   NPE_SVC_DOMAIN_JOIN_PASSWORD:
+    #     required: false
+    #   PERSONAL_ACCESS_TOKEN:
+    #     required: false
+    #   AZDO_PERSONAL_ACCESS_TOKEN: 
+    #     required: false
+    #   JIRA_API_KEY:
+    #       required: false
+    #   SSH_PRIVATE_KEY:
+    #     required: false
+    #   GH_REPO_READ_PRIVATE_KEY:
+    #     required: false
 
 jobs:
   say-hello:
